@@ -50,7 +50,7 @@ exports = module.exports = function mountHtml(app, opts) {
 
       }
       else {
-        debug('not mounting request for a path containing a '.' "%s"', parsedUrl.pathname);
+        debug('not mounting request for a path containing a \'.\' "%s"', parsedUrl.pathname);
       }
 
     }

@@ -2,7 +2,7 @@
   "name": "koa-mount-html",
   "description": "Mount all GET requests for text/html content types to a given KOA application",
   "author": "Jonathan Felchlin <jonathan@xgecko.com>",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "scripts": {
     "test": "mocha ./test",
     "watch:test": "mocha ./test --watch",

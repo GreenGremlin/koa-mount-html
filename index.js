@@ -1,105 +1,61 @@
-const CONTENT_TYPE_HTML = 'text/html';
+const debug = require('debug')('koa-mount-html');
+const compose = require('koa-compose');
 
-function* rewriteIndex(next) {
-  if (this.accepts().toString().substr(0, CONTENT_TYPE_HTML.length) === CONTENT_TYPE_HTML) {
-    this.request.url = '/index.html';
-  }
-  yield *next;
-}
-
+const assert = require('assert');
+const path = require('path');
 const url = require('url');
 
-function evaluateRewriteRule(parsedUrl, match, rule) {
-  if (typeof rule === 'string') {
-    return rule;
-  }
-  else if (typeof rule !== 'function') {
-    throw new Error('Rewrite rule can only be of type string of function.');
-  }
+const CONTENT_TYPE_HTML = 'text/html';
 
-  return rule({
-    parsedUrl: parsedUrl,
-    match: match
-  });
+function acceptsHtml (acceptsString) {
+  return acceptsString.indexOf('application/json') !== 0
+         && (acceptsString.indexOf('text/html') !== -1 || acceptsString.indexOf('*/*') !== -1)
 }
 
-function acceptsHtml(header) {
-  return header.indexOf('text/html') !== -1 || header.indexOf('*/*') !== -1;
-}
+function *noop(){}
 
-function getLogger(options) {
-  if (options && options.logger) {
-    return options.logger;
-  }
-  else if (options && options.verbose) {
-    return console.log.bind(console);
-  }
-  return () => {};
-}
+exports = module.exports = function mountHtml(app, opts) {
+  opts = opts || {};
 
-exports = module.exports = function historyApiFallback(_options) {
-  const options = _options || {};
-  const logger = getLogger(options);
+  const downstream = app.middleware
+    ? compose(app.middleware)
+    : app;
 
-  // return function(req, res, next) {
-  return function* (next) {
-    // var headers = req.headers;
-    const accepts = this.accepts().toString();
-    var reason = '';
-    var parsedUrl;
-    var rewriteTarget;
-    var rewrites;
-    var rewritten;
+  assert(downstream, 'koa app / middleware required');
 
-    if (this.request.method !== 'GET') {
-      reason = 'because the method is not GET.';
+  return function* (upstream) {
+
+    if (opts.defer) {
+      yield* upstream;
+      // response is already handled
+      if (this.body != null || this.status != 404) return;
     }
-    else if (!accepts || typeof accepts !== 'string') {
-      reason = 'because the client did not send an HTTP accept header.';
-    }
-    else if (accepts.indexOf('application/json') === 0) {
-      reason = 'because the client prefers JSON.';
-    }
-    else if (!acceptsHtml(accepts)) {
-      reason = 'because the client does not accept HTML.';
-    }
-    else {
 
-      parsedUrl = url.parse(this.request.url);
-      rewrites = options.rewrites || [];
+    if (this.method === 'GET' && this.accepts('text/html')) {
 
-      rewritten = rewrites.some(rewrite => {
-        const match = parsedUrl.pathname.match(rewrite.from);
+      const parsedUrl = url.parse(this.url);
 
-        if (match !== null) {
-          rewriteTarget = evaluateRewriteRule(parsedUrl, match, rewrite.to);
-          logger('Rewriting', this.request.method, this.request.url, 'to', rewriteTarget);
-          this.request.url = rewriteTarget;
-          return true;
+      if (opts.includeDotPaths || parsedUrl.pathname.indexOf('.') === -1) {
+
+        debug(`mounting for url "${this.url}"`);
+
+        if (opts.defer) {
+          console.info('###### Running deferred downstream');
+          yield* downstream.call(this, noop());
         }
-      });
-      if (rewritten) {
-        yield *next;
-      }
+        else {
+          yield* downstream.call(this, function * callback(){
+            yield* upstream;
+          }.call(this));
+        }
 
-      if (parsedUrl.pathname.indexOf('.') === -1) {
-        rewriteTarget = options.index || '/index.html';
-        logger('Rewriting', this.request.method, this.request.url, 'to', rewriteTarget);
-        this.request.url = rewriteTarget;
       }
       else {
-        reason = 'because the path includes a dot (.) character.';
+        debug(`not mounting request for a path containing a '.' "${parsedUrl.pathname}"`);
       }
+
     }
 
-    if (reason) {
-      logger(
-        'Not rewriting',
-        this.request.method,
-        this.request.url,
-        reason
-      );
-    }
-    yield *next;
+    yield *upstream;
   };
 };

@@ -37,10 +37,9 @@ exports = module.exports = function mountHtml(app, opts) {
 
       if (opts.includeDotPaths || parsedUrl.pathname.indexOf('.') === -1) {
 
-        debug(`mounting for url "${this.url}"`);
+        debug('mounting for url "%s"', this.url);
 
         if (opts.defer) {
-          console.info('###### Running deferred downstream');
           yield* downstream.call(this, noop());
         }
         else {
@@ -51,7 +50,7 @@ exports = module.exports = function mountHtml(app, opts) {
 
       }
       else {
-        debug(`not mounting request for a path containing a '.' "${parsedUrl.pathname}"`);
+        debug('not mounting request for a path containing a '.' "%s"', parsedUrl.pathname);
       }
 
     }
